@@ -8,4 +8,5 @@ import androidx.lifecycle.ViewModel
 class TuneViewModel : ViewModel() {
 
     val value = MutableLiveData<Float>()
+    val stepValue = MutableLiveData<Float>()
 }

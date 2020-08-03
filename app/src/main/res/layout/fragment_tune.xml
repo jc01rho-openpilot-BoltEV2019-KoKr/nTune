@@ -117,10 +117,22 @@
         </LinearLayout>
 
         <TextView
+            android:id="@+id/textStepHolder"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_margin="10dp"
+            android:textStyle="bold"
+            android:textSize="20sp"
+            />
+
+
+        <EditText
             android:id="@+id/textStep"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
+            android:inputType="numberSigned"
             android:layout_margin="10dp"
             android:textStyle="bold"
             android:textSize="20sp"

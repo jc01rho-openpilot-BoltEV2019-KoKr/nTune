@@ -2,6 +2,8 @@ package com.neokii.ntune.ui.main
 
 import android.os.Bundle
 import android.os.Handler
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -58,6 +60,7 @@ class TuneFragment : Fragment() {
             itemInfo = it.getParcelable("item")!!
             tuneViewModel = ViewModelProviders.of(this).get(TuneViewModel::class.java).apply {
                 value.value = 0.0f
+                stepValue.value = 0.0f
             }
         }
     }
@@ -70,6 +73,9 @@ class TuneFragment : Fragment() {
         val root = inflater.inflate(R.layout.fragment_tune, container, false)
         tuneViewModel.value.observe(viewLifecycleOwner, Observer<Float> {
             textValue.text = itemInfo.toString(it)
+        })
+        tuneViewModel.stepValue.observe(viewLifecycleOwner, Observer<Float> {
+            textStep.setText(itemInfo.toString(it))
         })
 
         Handler().post {
@@ -84,7 +90,25 @@ class TuneFragment : Fragment() {
         textKey.text = itemInfo.key
         textMin.text = itemInfo.toString(itemInfo.min)
         textMax.text = itemInfo.toString(itemInfo.max)
-        textStep.text = "Step: ${itemInfo.step}"
+        textStep.setText("${itemInfo.step}")
+        textStepHolder.text = "Step:"
+
+
+        textStep.addTextChangedListener(object : TextWatcher {
+
+            override fun afterTextChanged(s: Editable) {}
+
+            override fun beforeTextChanged(s: CharSequence, start: Int,
+                                           count: Int, after: Int) {
+            }
+
+            override fun onTextChanged(s: CharSequence, start: Int,
+                                       before: Int, count: Int) {
+                updateStep(s.toString().toFloat())
+
+            }
+        })
+
 
         btnIncrease.setOnClickListener {
             increase(1.0f * itemInfo.step)
@@ -153,6 +177,10 @@ class TuneFragment : Fragment() {
 
                     tuneViewModel.value.apply {
                         value = lastJson.getDouble(itemInfo.key).toFloat()
+
+                    }
+                    tuneViewModel.stepValue.apply {
+                        value = lastJson.getDouble(itemInfo.key+".step").toFloat()
                     }
                 }
                 catch (e:Exception){}
@@ -184,6 +212,17 @@ class TuneFragment : Fragment() {
             update(value)
         }
         catch (e:Exception){
+            showSnackbar(e.localizedMessage)
+        }
+    }
+
+
+    private fun updateStep(value: Float) {
+        try {
+            lastJson.put(itemInfo.key+".step", value)
+            update(tuneViewModel.value.value!!)
+
+        }catch (e:Exception){
             showSnackbar(e.localizedMessage)
         }
     }
