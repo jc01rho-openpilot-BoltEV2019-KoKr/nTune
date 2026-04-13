@@ -26,16 +26,18 @@ class TuneSwitchFragment : Fragment() {
 
     private lateinit var remoteConfFile: String
     private lateinit var host: String
+    private lateinit var port: String
     private var session: SshSession? = null
 
     companion object {
         @JvmStatic
-        fun newInstance(itemInfo: TuneItemInfo, host:String, remoteConfFile:String): TuneSwitchFragment {
+        fun newInstance(itemInfo: TuneItemInfo, host:String, port:String, remoteConfFile:String): TuneSwitchFragment {
 
             return TuneSwitchFragment().apply {
                 arguments = Bundle().apply {
                     putParcelable("item", itemInfo)
                     putString("host", host)
+                    putString("port", port)
                     putString("remoteConfFile", remoteConfFile)
                 }
             }
@@ -49,6 +51,7 @@ class TuneSwitchFragment : Fragment() {
 
             remoteConfFile = it.getString("remoteConfFile", "")
             host = it.getString("host", "")
+            port = SshSession.normalizePort(it.getString("port", SshSession.DEFAULT_PORT_STRING))
             itemInfo = it.getParcelable("item")!!
             tuneViewModel = ViewModelProviders.of(this).get(TuneViewModel::class.java).apply {
                 value.value = 0.0f
@@ -99,7 +102,14 @@ class TuneSwitchFragment : Fragment() {
     private fun connect()
     {
         enableButtons(false)
-        session = SshSession(host, 8022)
+        val parsedPort = SshSession.parsePort(port)
+        if(parsedPort == null) {
+            enableButtons(true)
+            showSnackbar(getString(R.string.invalid_port))
+            return
+        }
+
+        session = SshSession(host, parsedPort)
         session?.connect(object: SshSession.OnConnectListener{
             override fun onConnect() {
                 enableButtons(true)

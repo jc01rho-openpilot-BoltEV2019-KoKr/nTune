@@ -8,16 +8,16 @@ import com.neokii.ntune.TuneItemInfo
 
 
 class SectionsPagerAdapter(private val context: Context, fm: FragmentManager, private val itemInfos: List<TuneItemInfo>,
-    private val host: String, private val remoteConfFile: String) :
+    private val host: String, private val port: String, private val remoteConfFile: String) :
     FragmentPagerAdapter(fm) {
 
     override fun getItem(position: Int): Fragment {
 
         val itemInfo = itemInfos[position]
         if(itemInfo.step == 0.0f)
-            return TuneSwitchFragment.newInstance(itemInfos[position], host, remoteConfFile)
+            return TuneSwitchFragment.newInstance(itemInfos[position], host, port, remoteConfFile)
         else
-            return TuneFragment.newInstance(itemInfos[position], host, remoteConfFile)
+            return TuneFragment.newInstance(itemInfos[position], host, port, remoteConfFile)
     }
 
     override fun getPageTitle(position: Int): CharSequence? {

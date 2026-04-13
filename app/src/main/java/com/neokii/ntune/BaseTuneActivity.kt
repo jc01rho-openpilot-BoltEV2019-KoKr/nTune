@@ -45,7 +45,18 @@ abstract class BaseTuneActivity : BaseActivity(), ViewPager.OnPageChangeListener
         intent?.let {
 
             try {
-                val session = SshSession(it.getStringExtra("host")!!, 8022)
+                val port = SshSession.parsePort(it.getStringExtra("port"))
+                if(port == null) {
+                    Snackbar.make(
+                        findViewById(android.R.id.content),
+                        R.string.invalid_port,
+                        Snackbar.LENGTH_LONG
+                    )
+                        .show()
+                    return@let
+                }
+
+                val session = SshSession(it.getStringExtra("host")!!, port)
                 session.connect(object : SshSession.OnConnectListener {
                     override fun onConnect() {
 
@@ -159,6 +170,7 @@ abstract class BaseTuneActivity : BaseActivity(), ViewPager.OnPageChangeListener
                     SectionsPagerAdapter(
                         this, supportFragmentManager, list,
                         host,
+                        SshSession.normalizePort(it.getStringExtra("port")),
                         getRemoteConfFile()
                     )
                 }
@@ -232,8 +244,18 @@ abstract class BaseTuneActivity : BaseActivity(), ViewPager.OnPageChangeListener
     private fun resetAll() {
         intent?.getStringExtra("host")?.let { host ->
             try {
+                val port = SshSession.parsePort(intent?.getStringExtra("port"))
+                if(port == null) {
+                    Snackbar.make(
+                        findViewById(android.R.id.content),
+                        R.string.invalid_port,
+                        Snackbar.LENGTH_LONG
+                    )
+                        .show()
+                    return
+                }
 
-                val session = SshSession(host, 8022)
+                val session = SshSession(host, port)
                 session.connect(object : SshSession.OnConnectListener {
                     override fun onConnect() {
                         session.exec(
