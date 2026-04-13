@@ -17,6 +17,7 @@ class ExceptionCaptureActivity : BaseActivity() {
 
     lateinit var editLog: EditText
     private var host: String? = null
+    private var port: String = SshSession.DEFAULT_PORT_STRING
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,13 +27,27 @@ class ExceptionCaptureActivity : BaseActivity() {
 
         intent?.let {
             host = it.getStringExtra("host")
+            port = SshSession.normalizePort(it.getStringExtra("port"))
             host?.let { h ->
 
                 try {
-                    val session = SshSession(it.getStringExtra("host"), 8022)
+                    val parsedPort = SshSession.parsePort(port)
+                    if(parsedPort == null) {
+                        Snackbar.make(
+                            findViewById(android.R.id.content),
+                            R.string.invalid_port,
+                            Snackbar.LENGTH_LONG
+                        )
+                            .show()
+                        return@let
+                    }
+
+                    val session = SshSession(h, parsedPort)
 
                     session.connect(object : SshSession.OnConnectListener {
                         override fun onConnect() {
+                            SettingUtil.setString(applicationContext, "last_host", h)
+                            SettingUtil.setString(applicationContext, "last_port", parsedPort.toString())
                             session.exec(
                                 "ls -tr /data/log | tail -1",
                                 object : SshSession.OnResponseListener {

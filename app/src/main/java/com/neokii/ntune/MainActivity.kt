@@ -56,6 +56,8 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
                 editHost.setText(it)
         }
 
+        editPort.setText(SettingUtil.getString(applicationContext, "last_port", SshSession.DEFAULT_PORT_STRING))
+
         /*btnConnectIndi.setOnClickListener {
             handleConnect(IndiTuneActivity::class.java)
         }*/
@@ -87,10 +89,12 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
         btnExceptionCapture.setOnClickListener {
 
             val host = editHost.text.toString();
+            val port = getPortOrShowError() ?: return@setOnClickListener
             if(host.isNotEmpty())
             {
                 val intent = Intent(this, ExceptionCaptureActivity::class.java)
                 intent.putExtra("host", host)
+                intent.putExtra("port", port.toString())
                 startActivity(intent)
             }
         }
@@ -103,15 +107,18 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
             handleGitAccount()
         }
 
-        editHost.setOnKeyListener { v, keyCode, _ -> Boolean
+        val onInputKeyListener = View.OnKeyListener { v, keyCode, _ -> Boolean
             if(keyCode == KeyEvent.KEYCODE_ENTER)
             {
                 (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(v.windowToken, 0)
-                return@setOnKeyListener true
+                return@OnKeyListener true
             }
 
-            return@setOnKeyListener false
+            return@OnKeyListener false
         }
+
+        editHost.setOnKeyListener(onInputKeyListener)
+        editPort.setOnKeyListener(onInputKeyListener)
 
         checkComma3?.isChecked = SettingUtil.getBoolean(applicationContext, "is_tici", false)
 
@@ -155,6 +162,7 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
     {
         try {
             val host = editHost.text.toString();
+            val port = getPortOrShowError() ?: return
             if(host.isNotEmpty())
             {
                 updateControls(true)
@@ -163,17 +171,20 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
                     getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                 imm.hideSoftInputFromWindow(editHost.windowToken, 0)
 
-                session = SshSession(host, 8022)
+                session?.close()
+                session = SshSession(host, port)
                 session?.connect(object : SshSession.OnConnectListener {
                     override fun onConnect() {
 
                         updateControls(false)
 
                         SettingUtil.setString(applicationContext, "last_host", host)
+                        SettingUtil.setString(applicationContext, "last_port", port.toString())
 
                         val intent = Intent(this@MainActivity, cls)
 
                         intent.putExtra("host", host)
+                        intent.putExtra("port", port.toString())
                         startActivity(intent)
                     }
 
@@ -213,12 +224,14 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
             progBar.visibility = View.VISIBLE
             btnScan.isEnabled = false
             editHost.isEnabled = false
+            editPort.isEnabled = false
         }
         else
         {
             progBar.visibility = View.INVISIBLE
             btnScan.isEnabled = true
             editHost.isEnabled = true
+            editPort.isEnabled = true
         }
     }
 
@@ -229,9 +242,11 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
         if(pendingScan)
             return
 
+        val port = getPortOrShowError() ?: return
+
         pendingScan = true
         updateScan(pendingScan)
-        EonScanner().startScan(applicationContext, 8022, object : EonScanner.OnResultListener {
+        EonScanner().startScan(applicationContext, port, object : EonScanner.OnResultListener {
             override fun onResult(ip: String?) {
 
                 pendingScan = false
@@ -346,13 +361,19 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
 
     fun shell(host: String, cmds: ArrayList<String>)
     {
+        val port = getPortOrShowError() ?: return
+        shell(host, port, cmds)
+    }
+
+    fun shell(host: String, port: Int, cmds: ArrayList<String>)
+    {
         try {
-            if(shell == null || shell?.host != host || !shell?.isConnected()!!) {
+            if(shell == null || shell?.host != host || shell?.port != port || !shell?.isConnected()!!) {
 
                 if(shell != null)
                     shell?.close()
 
-                shell = SshShell(host, 8022, this)
+                shell = SshShell(host, port, this)
                 shell?.start()
             }
 
@@ -384,6 +405,7 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
     private fun syncTime()
     {
         val host = editHost.text.toString()
+        val port = getPortOrShowError() ?: return
 
         val pattern = "yyyy-MM-dd HH:mm:ss"
         val simpleDateFormat = SimpleDateFormat(pattern, Locale.getDefault())
@@ -393,7 +415,7 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
         if(host.isNotEmpty())
         {
             val cmd = "date -s \"$date\""
-            shell(host, arrayListOf(cmd))
+            shell(host, port, arrayListOf(cmd))
         }
     }
 
@@ -423,32 +445,42 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
 
 
         if(session != null) {
-            runnable()
+            val host = editHost.text.toString()
+            val port = getPortOrShowError() ?: return
+
+            if(session?.host != host || session?.port != port || session?.isConnected() != true) {
+                session?.close()
+                session = null
+            }
+            else {
+                runnable()
+                return
+            }
         }
-        else {
-            val host = editHost.text.toString();
-            if(host.isNotEmpty()) {
-                val imm: InputMethodManager =
-                    getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.hideSoftInputFromWindow(editHost.windowToken, 0)
 
-                session = SshSession(host, 8022).also { s ->
+        val host = editHost.text.toString();
+        val port = getPortOrShowError() ?: return
+        if(host.isNotEmpty()) {
+            val imm: InputMethodManager =
+                getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.hideSoftInputFromWindow(editHost.windowToken, 0)
 
-                    s.connect(object : SshSession.OnConnectListener {
-                        override fun onConnect() {
-                            runnable()
-                        }
+            session = SshSession(host, port).also { s ->
 
-                        override fun onFail(e: Exception) {
-                            Snackbar.make(
-                                findViewById(android.R.id.content),
-                                e.localizedMessage,
-                                Snackbar.LENGTH_LONG
-                            )
-                                .show()
-                        }
-                    })
-                }
+                s.connect(object : SshSession.OnConnectListener {
+                    override fun onConnect() {
+                        runnable()
+                    }
+
+                    override fun onFail(e: Exception) {
+                        Snackbar.make(
+                            findViewById(android.R.id.content),
+                            e.localizedMessage,
+                            Snackbar.LENGTH_LONG
+                        )
+                            .show()
+                    }
+                })
             }
         }
 
@@ -477,7 +509,7 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
 
                         session?.let {
                             val branch = items[which].replace("*", "").replace("remotes/", "-t ").trim()
-                            shell(it.host, arrayListOf("git checkout $branch"))
+                            shell(it.host, it.port, arrayListOf("git checkout $branch"))
                         }
                     })
 
@@ -487,6 +519,27 @@ class MainActivity : BaseActivity(), SshShell.OnSshListener
                     }
             }
         }
+    }
+
+    private fun getPortOrShowError(): Int?
+    {
+        val portText = SshSession.normalizePort(editPort.text.toString())
+        val port = SshSession.parsePort(portText)
+        if(port == null) {
+            editPort.error = getString(R.string.invalid_port)
+            Snackbar.make(
+                findViewById(android.R.id.content),
+                R.string.invalid_port,
+                Snackbar.LENGTH_LONG
+            )
+                .show()
+            return null
+        }
+
+        editPort.error = null
+        SettingUtil.setString(applicationContext, "last_port", portText)
+        editPort.setText(portText)
+        return port
     }
 
 }
