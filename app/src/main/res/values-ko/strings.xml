@@ -1,6 +1,9 @@
 <resources>
 
     <string name="app_name">nTune</string>
+    <string name="hint_port">8022</string>
+    <string name="port">포트</string>
+    <string name="invalid_port">포트는 1부터 65535 사이여야 합니다.</string>
 
     <string name="btn_scan">"이온 찾기"</string>
 

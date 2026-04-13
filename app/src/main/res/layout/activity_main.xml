@@ -38,6 +38,18 @@
                 android:imeOptions="actionNone"
                 android:layout_margin="3dp" />
 
+            <EditText
+                android:id="@+id/editPort"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:textSize="13sp"
+                android:text="@string/hint_port"
+                android:hint="@string/port"
+                android:inputType="number"
+                android:imeOptions="actionNone"
+                android:layout_margin="3dp" />
+
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnScan"
                 android:layout_width="wrap_content"
