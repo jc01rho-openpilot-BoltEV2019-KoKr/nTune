@@ -12,6 +12,9 @@ class SshSession(val host: String, val port: Int) {
 
     companion object
     {
+        const val DEFAULT_PORT = 8022
+        const val DEFAULT_PORT_STRING = "8022"
+
         val privateKey = "-----BEGIN PRIVATE KEY-----\n" +
                 "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC+iXXq30Tq+J5N\n" +
                 "Kat3KWHCzcmwZ55nGh6WggAqECa5CasBlM9VeROpVu3beA+5h0MibRgbD4DMtVXB\n" +
@@ -42,6 +45,19 @@ class SshSession(val host: String, val port: Int) {
                 "-----END PRIVATE KEY-----"
 
         val publicKey = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+iXXq30Tq+J5NKat3KWHCzcmwZ55nGh6WggAqECa5CasBlM9VeROpVu3beA+5h0MibRgbD4DMtVXBt6gEvZ8nd04E7eLA9LTZyFDZ7SkSOVj4oXOQsT0GnJmKrASW5KslTWqVzTfo2XCtZ+004ikLxmyFeBO8NOcErW1pa8gFdQDToH9FrA7kgysic/XVESTOoe7XlzRoe/eZacEQ+jtnmFd21A4aEADkk00Ahjr0uKaJiLUAPatxs2icIXWpgYtfqqtaKF23wSt61OTu6cAwXbOWr3m+IUSRUO0IRzEIQS3z1jfd1svgzSgSSwZ1Lhj4AoKxIEAIc8qJrO4uymCJ imported-openssh-key"
+
+        fun normalizePort(port: String?): String {
+            val value = port?.trim().orEmpty()
+            return if (value.isEmpty()) DEFAULT_PORT_STRING else value
+        }
+
+        fun parsePort(port: String?): Int? {
+            val value = normalizePort(port).toIntOrNull() ?: return null
+            if(value !in 1..65535)
+                return null
+
+            return value
+        }
 
     }
 
@@ -102,6 +118,11 @@ class SshSession(val host: String, val port: Int) {
                 }
             }
         }
+    }
+
+    fun isConnected(): Boolean
+    {
+        return ::session.isInitialized && session.isConnected
     }
 
     fun exec(command: String, listener: OnResponseListener?)
@@ -192,7 +213,8 @@ class SshSession(val host: String, val port: Int) {
 
     fun close()
     {
-        session.disconnect()
+        if(::session.isInitialized)
+            session.disconnect()
     }
 
     private fun waitUntilChannelClosed(executionChannel: Channel) {

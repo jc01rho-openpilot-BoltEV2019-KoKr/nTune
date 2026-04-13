@@ -16,7 +16,7 @@ import kotlin.collections.ArrayList
 
 class SshShell(
     val host: String,
-    private val port: Int,
+    val port: Int,
     private val listener: OnSshListener
 ) : Thread()
 {
