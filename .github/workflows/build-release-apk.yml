@@ -12,6 +12,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -29,14 +34,37 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build release APKs
-        run: ./gradlew assembleRelease --console=plain
+      - name: Prepare signed release build
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' && env.ANDROID_KEYSTORE_PASSWORD != '' && env.ANDROID_KEY_ALIAS != '' && env.ANDROID_KEY_PASSWORD != '' }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "BUILD_TASK=assembleRelease" >> "$GITHUB_ENV"
+          echo "ARTIFACT_PATH=app/build/outputs/apk/*/release/*.apk" >> "$GITHUB_ENV"
+          echo "BUILD_KIND=release" >> "$GITHUB_ENV"
 
-      - name: Upload release APK artifacts
+      - name: Require signing secrets for tagged releases
+        if: ${{ startsWith(github.ref, 'refs/tags/') && (env.ANDROID_KEYSTORE_BASE64 == '' || env.ANDROID_KEYSTORE_PASSWORD == '' || env.ANDROID_KEY_ALIAS == '' || env.ANDROID_KEY_PASSWORD == '') }}
+        run: |
+          echo "Tagged releases require all Android signing secrets." >&2
+          exit 1
+
+      - name: Fallback to installable debug build
+        if: ${{ github.event_name == 'workflow_dispatch' && (env.ANDROID_KEYSTORE_BASE64 == '' || env.ANDROID_KEYSTORE_PASSWORD == '' || env.ANDROID_KEY_ALIAS == '' || env.ANDROID_KEY_PASSWORD == '') }}
+        run: |
+          echo "BUILD_TASK=assembleDebug" >> "$GITHUB_ENV"
+          echo "ARTIFACT_PATH=app/build/outputs/apk/*/debug/*.apk" >> "$GITHUB_ENV"
+          echo "BUILD_KIND=debug" >> "$GITHUB_ENV"
+          echo "::notice::Release signing secrets are missing, so an installable debug APK will be published instead."
+
+      - name: Build installable APKs
+        run: ./gradlew "$BUILD_TASK" --console=plain
+
+      - name: Upload installable APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-apks
-          path: app/build/outputs/apk/*/release/*.apk
+          name: installable-apks
+          path: ${{ env.ARTIFACT_PATH }}
           if-no-files-found: error
 
   release:
@@ -50,7 +78,7 @@ jobs:
       - name: Download built APK artifacts
         uses: actions/download-artifact@v4
         with:
-          name: release-apks
+          name: installable-apks
           path: dist
 
       - name: Publish GitHub Release
